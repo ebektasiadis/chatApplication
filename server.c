@@ -16,46 +16,45 @@
 
 router_t indexes[] = {
   {NEW_USER, sizeof(C_newUser), sizeof(S_newUser), newUser},
+  {GET_TOTAL_USERS, 0, sizeof(S_getTotalUsers), getTotalUsers},
+  {GET_USER, sizeof(C_getUser), sizeof(S_getUser), getUser},
 };
-
-void* handleCmd(int cmd){
-  //read()
-  void* outputData;
-  return outputData;
-}
 
 void* core(void* args){
   threadArgs_t threadArgs = *(threadArgs_t*)args;
 
   while(true){
     int cmd;
+    void* input;
+    data_t data;
+
     read(threadArgs.sID, &cmd, sizeof(int));
     printf("Received cmd: %d\n", cmd);
     if(cmd >= 0){
       printf("For this command you will receive %zu bytes and send back %zu bytes.\n", indexes[cmd].lClient, indexes[cmd].lServer);
-      void* input = (void*)malloc(indexes[cmd].lClient);
-      read(threadArgs.sID, input, indexes[cmd].lClient);
+      input = (void*)malloc(indexes[cmd].lClient);
+      if(indexes[cmd].lClient > 0){
+        printf("Read from client %lu bytes\n", read(threadArgs.sID, input, indexes[cmd].lClient));
+        data.dClient = input;
+      }
 
-      data_t data;
-      data.dClient = input;
-      data.threadArgs = &threadArgs;
-      data.dServer = (void*)malloc(indexes[cmd].lServer);
+      if(indexes[cmd].lServer > 0){
+        data.threadArgs = &threadArgs;
+        data.dServer = (void*)malloc(indexes[cmd].lServer);
+        indexes[cmd].function(&data);
+        printf("Wrote on client %lu bytes\n", write(threadArgs.sID, data.dServer, indexes[cmd].lServer));
+      }
 
-      indexes[cmd].function(&data);
-      printf("Wrote: %d bytes\n", write(threadArgs.sID, data.dServer, indexes[cmd].lServer));
     }else{
       switch(cmd){
         case DISCONNECT: pthread_exit(NULL); break;
       }
     }
   }
-
-
 }
 
 int main(int argc, char* argv[]){
   int totalConnected = 0;
-  char** usernames;
 
   int bindv, socketv, clientv, threadv;
   struct sockaddr_in socketAddr;
@@ -85,7 +84,7 @@ int main(int argc, char* argv[]){
     exit(1);
   }
 
-  usernames = (char**)malloc(sizeof(char*));
+  char** usernames = (char**)malloc(sizeof(char*));
 
   //Threading.
   while(true){
@@ -94,11 +93,13 @@ int main(int argc, char* argv[]){
       perror("accept");
     }
 
+    printf("New user logged in and found username pointer at %p\n", &usernames);
+
     if(pthread_create(&threadArgs.tID, NULL, core, &threadArgs) != 0){
       perror("pthread_create");
     }else{
       threadArgs.sID = clientv;
-      threadArgs.usernames = usernames;
+      threadArgs.usernames = &usernames;
       threadArgs.totalConnected = &totalConnected;
     }
 

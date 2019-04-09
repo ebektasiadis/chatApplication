@@ -1,12 +1,14 @@
 #ifndef _STRUCTS_H_
 #define _STRUCTS_H_
 
+
   //pthread on create struct variable
   typedef struct {
-    pthread_t tID;
-    int       sID;
-    int*      totalConnected;
-    char**    usernames;
+    pthread_t   tID;
+    int         sID;
+    int*        totalConnected;
+    char***     usernames;
+    messages_t* messages;
   } threadArgs_t;
 
   typedef struct {
@@ -27,9 +29,21 @@
     char username[MAX_USERNAME_LENGTH];
   } C_newUser;
 
+  typedef struct {
+    int pos;
+  } C_getUser;
+
   //server structs
   typedef struct {
     int confirm;
   } S_newUser;
+
+  typedef struct {
+    int totalUsers;
+  } S_getTotalUsers;
+
+  typedef struct {
+    char username[MAX_USERNAME_LENGTH];
+  } S_getUser;
 
 #endif

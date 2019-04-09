@@ -7,6 +7,8 @@
 //Commands
 #define DISCONNECT -1
 #define NEW_USER 0
+#define GET_TOTAL_USERS 1
+#define GET_USER 2
 
 
 #endif
