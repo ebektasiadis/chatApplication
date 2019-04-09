@@ -1,14 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <stdbool.h>
-// #include <fcntl.h>
 #include <unistd.h>
-// #include <sys/types.h>
 #include <arpa/inet.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <netinet/ip.h>
 #include "defines.h"
 #include "structs.h"
 #include "clientFunctions.h"
@@ -18,13 +14,23 @@ router_t indexes[] = {
   {NEW_USER, sizeof(C_newUser), sizeof(S_newUser)},
   {GET_TOTAL_USERS, 0, sizeof(S_getTotalUsers)},
   {GET_USER, sizeof(C_getUser), sizeof(S_getUser)},
+  {POST_MESSAGE, sizeof(C_postMessage), 0},
+  {GET_MESSAGES, 0, sizeof(S_getMessages)},
 };
+
+void sigHandler(int sigID){
+  sendCmd(DISCONNECT, NULL);
+  exit(1);
+}
+
 
 int main(int argc, char* argv[]){
   int connectv;
   struct sockaddr_in socketAddr;
-
   C_newUser cNewUser;
+
+  signal(SIGINT, sigHandler);
+  signal(SIGTSTP, sigHandler);
 
   socketv = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -46,7 +52,7 @@ int main(int argc, char* argv[]){
 
   cNewUser = usernameInput();
 
-  char msg[MAX_MESSAGE_LENGTH];
+  char msg[MAX_MESSAGE_LENGTH], msgToBeTokenized[MAX_MESSAGE_LENGTH];;
   char* word;
   char** words = (char**)malloc(sizeof(char*));
   int totalWords;
@@ -59,19 +65,15 @@ int main(int argc, char* argv[]){
     totalWords = 0;
     system("clear");
 
-    word = strtok(msg, " ");
+    strcpy(msgToBeTokenized, msg);
+    word = strtok(msgToBeTokenized, " ");
 
-    while( word != NULL ) {
+    while(word != NULL) {
       totalWords++;
       words = (char**)realloc(words, sizeof(char*)*totalWords);
       words[totalWords-1] = (char*)malloc(sizeof(char) * strlen(word));
       strcpy(words[totalWords-1], word);
       word = strtok(NULL, " ");
-    }
-
-    int i;
-    for(i = 0; i < totalWords; i++){
-      printf("Word %d: %s\n", i, words[i]);
     }
 
     if(totalWords == 0)
@@ -80,6 +82,7 @@ int main(int argc, char* argv[]){
     if(!strcmp(words[0], "/u") || !strcmp(words[0], "/users")){
       showUsers();
     }else if(!strcmp(words[0], "/r") || !strcmp(words[0], "/refresh")){
+      showMessages();
     }else if(!strcmp(words[0], "/e") || !strcmp(words[0], "/exit")){
       sendCmd(DISCONNECT, NULL);
       exit(0);
@@ -88,8 +91,9 @@ int main(int argc, char* argv[]){
       printf("/u OR /users   :: Show online users\n");
       printf("/r OR /refresh :: Refresh messages\n");
       printf("/e OR /exit    :: Exit application (Can be happen with CTRL+C too)\n");
-    }else if(strlen(words[0]) > 0 && words[0][0] == '@'){
-      printf("Its a message\n");
+    }else if(strlen(words[0]) > 0 && words[0][0] == '@' && totalWords > 1){
+      sendCmd(POST_MESSAGE, msg);
+      showMessages();
     }else{
       printf("Commmand not found\n");
     }

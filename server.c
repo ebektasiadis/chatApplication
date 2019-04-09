@@ -3,13 +3,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <pthread.h>
-// #include <fcntl.h>
 #include <unistd.h>
-// #include <sys/types.h>
 #include <arpa/inet.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <netinet/ip.h>
 #include "defines.h"
 #include "structs.h"
 #include "serverFunctions.h"
@@ -18,7 +13,32 @@ router_t indexes[] = {
   {NEW_USER, sizeof(C_newUser), sizeof(S_newUser), newUser},
   {GET_TOTAL_USERS, 0, sizeof(S_getTotalUsers), getTotalUsers},
   {GET_USER, sizeof(C_getUser), sizeof(S_getUser), getUser},
+  {POST_MESSAGE, sizeof(C_postMessage), 0, postMessage},
+  {GET_MESSAGES, 0, sizeof(S_getMessages), getMessages},
 };
+
+void disconnect(threadArgs_t threadArgs){
+  int i, target;
+  char tmp[MAX_USERNAME_LENGTH], tmp2[MAX_USERNAME_LENGTH];
+
+  if(strlen(threadArgs.username) == 0)
+    return;
+
+  for(i = 0; i < *threadArgs.totalConnected; i++){
+    if(!strcmp(threadArgs.username, (*threadArgs.usernames)[i])){
+      target = i;
+      break;
+    }
+  }
+
+  if(*threadArgs.totalConnected-1 > 0){
+    strcpy(tmp, (*threadArgs.usernames)[*threadArgs.totalConnected-1]);
+    strcpy(tmp2, (*threadArgs.usernames)[target]);
+    strcpy((*threadArgs.usernames)[*threadArgs.totalConnected-1], tmp2);
+    strcpy((*threadArgs.usernames)[target], tmp);
+  }
+  *threadArgs.usernames = (char**)realloc(*threadArgs.usernames, sizeof(char*) * --(*threadArgs.totalConnected));
+}
 
 void* core(void* args){
   threadArgs_t threadArgs = *(threadArgs_t*)args;
@@ -38,16 +58,17 @@ void* core(void* args){
         data.dClient = input;
       }
 
+      data.threadArgs = &threadArgs;
+      data.dServer = (void*)malloc(indexes[cmd].lServer);
+      indexes[cmd].function(&data);
+
       if(indexes[cmd].lServer > 0){
-        data.threadArgs = &threadArgs;
-        data.dServer = (void*)malloc(indexes[cmd].lServer);
-        indexes[cmd].function(&data);
         printf("Wrote on client %lu bytes\n", write(threadArgs.sID, data.dServer, indexes[cmd].lServer));
       }
 
     }else{
       switch(cmd){
-        case DISCONNECT: pthread_exit(NULL); break;
+        case DISCONNECT: disconnect(threadArgs); pthread_exit(NULL); break;
       }
     }
   }
@@ -85,6 +106,9 @@ int main(int argc, char* argv[]){
   }
 
   char** usernames = (char**)malloc(sizeof(char*));
+  messages_t messages;
+  messages.totalMessages = 0;
+  messages.messagesIndex = (messageIndex_t*)malloc(sizeof(messageIndex_t));
 
   //Threading.
   while(true){
@@ -100,6 +124,7 @@ int main(int argc, char* argv[]){
     }else{
       threadArgs.sID = clientv;
       threadArgs.usernames = &usernames;
+      threadArgs.messages = &messages;
       threadArgs.totalConnected = &totalConnected;
     }
 

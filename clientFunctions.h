@@ -19,6 +19,7 @@ C_newUser usernameInput(){
       case 1: printf("Username length is not valid.\n"); break;
       case 2: printf("This username already exists.\n"); break;
       case 3: printf("You can not leave this field blank.\n"); break;
+      case 4: printf("You can not use special characters.\n"); break;
       default: printf("Confirmation code %d has no message.\n", sNewUser.confirm); break;
     }
   }while(sNewUser.confirm != 0);
@@ -41,6 +42,34 @@ void showUsers(){
     printf("%s ", sGetUser.username);
   }
   printf("\n");
+}
+
+void showMessages(){
+  int i;
+  S_getMessages sGetMessages;
+  void* output;
+  char* word;
+
+  printf("Showing %d most recent messages:\n", MAX_RETURN_MESSAGES);
+
+  output = sendCmd(GET_MESSAGES, NULL);
+  sGetMessages = *(S_getMessages*)output;
+  for(i = MAX_RETURN_MESSAGES-1; i >= 0; i--){
+    if(strlen(sGetMessages.messages[i].message) > 0){
+      printf("\033[1m%s: \033[0m", sGetMessages.messages[i].sender);
+      word = strtok(sGetMessages.messages[i].message, " ");
+
+      while(word != NULL) {
+        if(strlen(word) > 0 && word[0] == '@'){
+          printf("\033[33m%s\033[0m ", word);
+        }else{
+          printf("%s ", word);
+        }
+        word = strtok(NULL, " ");
+      }
+      printf("\n");
+    }
+  }
 }
 
 #endif
